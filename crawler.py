@@ -87,8 +87,29 @@ def fetch_content(document_id, topic_id, fingerprint):
     logger.debug(f"Content fetched for topicId: {topic_id}")
     return response.text
 
+def build_section_content(toc, document_id, fingerprint, prefix=""):
+    """Build HTML content for a section including all subsections recursively."""
+    section_html = []
+    for idx, item in enumerate(toc, start=1):
+        title = item["title"]
+        content_id = item["contentId"]
+        number_prefix = f"{prefix}{idx}" if prefix else str(idx)
+        html_content = fetch_content(document_id, content_id, fingerprint)
+        soup = BeautifulSoup(html_content, 'html.parser')
+        content_div = soup.find('div', class_='content-locale-en-US') or soup
+        topic_level = item.get("topic-level", len(prefix.split('.')) + 1 if prefix else 1)
+        
+        # Append current item's content
+        section_html.append(f"<section id='{content_id}'><h{topic_level}>{number_prefix} {title}</h{topic_level}>{str(content_div)}</section>")
+        
+        # Recursively append children content
+        if item["children"]:
+            section_html.append(build_section_content(item["children"], document_id, fingerprint, f"{number_prefix}."))
+    
+    return "\n".join(section_html)
+
 def build_html_structure(toc, document_id, fingerprint, full_html, prefix="", parent_path="", progress_bar=None):
-    """Recursively build HTML and file structure with numbered prefixes."""
+    """Build HTML structure with separate subsection files and full section content in parent files."""
     for idx, item in enumerate(toc, start=1):
         title = item["title"]
         content_id = item["contentId"]
@@ -98,32 +119,35 @@ def build_html_structure(toc, document_id, fingerprint, full_html, prefix="", pa
         numbered_title = f"{number_prefix}_{sanitized_title}"
         current_path = os.path.join(parent_path, numbered_title) if parent_path else numbered_title
 
-        # Fetch content for this section
+        # Fetch content for this item
         html_content = fetch_content(document_id, content_id, fingerprint)
         soup = BeautifulSoup(html_content, 'html.parser')
         content_div = soup.find('div', class_='content-locale-en-US') or soup
 
-        # 1. Append to full HTML with numbered title
-        section_html = f"<section id='{content_id}'><h{topic_level}>{number_prefix} {title}</h{topic_level}>{str(content_div)}</section>"
-        full_html.append(section_html)
+        # Build full content for this section (current item + subsections)
+        section_content = build_section_content([item], document_id, fingerprint, prefix)
 
-        # 2 & 3. Handle pages and sections with numbered folders/files
-        if not parent_path:  # Top-level page
+        # Append to full HTML for the complete documentation
+        full_html.append(section_content)
+
+        # Handle file writing based on level
+        if not parent_path:  # Top-level section
             page_dir = os.path.join(parent_path, numbered_title) if parent_path else numbered_title
             os.makedirs(page_dir, exist_ok=True)
             page_file = os.path.join(page_dir, f"{numbered_title}.html")
-            logger.info(f"Writing page file: {page_file}")
+            logger.info(f"Writing top-level section file (with subsections): {page_file}")
             with open(page_file, "w", encoding="utf-8") as f:
-                f.write(HTML_TEMPLATE.format(title=f"{number_prefix} {title}", content=section_html))
-        else:  # Section within a page
+                f.write(HTML_TEMPLATE.format(title=f"{number_prefix} {title}", content=section_content))
+        else:  # Subsection
             section_dir = parent_path
             os.makedirs(section_dir, exist_ok=True)
             section_file = os.path.join(section_dir, f"{numbered_title}.html")
-            logger.info(f"Writing section file: {section_file}")
+            logger.info(f"Writing subsection file (with aggregated sub-sections): {section_file}")
             with open(section_file, "w", encoding="utf-8") as f:
-                f.write(HTML_TEMPLATE.format(title=f"{number_prefix} {title}", content=html_content))
+                f.write(HTML_TEMPLATE.format(title=f"{number_prefix} {title}", content=section_content))
 
-        # Recurse into children with updated prefix
+
+        # Recurse into children
         if item["children"]:
             build_html_structure(item["children"], document_id, fingerprint, full_html, f"{number_prefix}.", current_path, progress_bar)
 
