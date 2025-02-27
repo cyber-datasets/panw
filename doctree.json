@@ -1,0 +1,62 @@
+{
+    "name": "Documentation",
+    "children": [
+      {
+        "name": "Cortex CLOUD",
+        "children": [
+          { "name": "Cloud Runtime Security", "link": "Cortex-CLOUD/Cortex-Cloud-Runtime-Security-Documentation/Get-started-with-Cortex-Cloud", "update": false},
+          { "name": "Cloud Posture Management", "link": "Cortex-CLOUD/Cortex-Cloud-Posture-Security-Documentation/Get-started-with-Cortex-Cloud", "update": false }
+        ],
+        "link": "https://docs-cortex.paloaltonetworks.com/p/cloud"
+      },
+      {
+        "name": "Cortex XSIAM",
+        "children": [
+          { "name": "Release Notes", "link": "Cortex-XSIAM/Cortex-XSIAM-Release-Notes/Cortex-XSIAM-Release-Information", "update": false },
+          { "name": "Deployment Steps", "link": "Cortex-XSIAM/Onboard-and-configure-Cortex-XSIAM/Deployment-steps", "update": false },
+          { "name": "Getting Started", "link": "Cortex-XSIAM/Cortex-XSIAM-Documentation/Get-started-with-Cortex-XSIAM", "update": false },
+          { "name": "XSIAM Premium", "link": "Cortex-XSIAM/Cortex-XSIAM-Premium-Documentation/Get-started-with-Cortex-XSIAM", "update": false },
+          { "name": "XSIAM Enterprise", "link": "Cortex-XSIAM/Cortex-XSIAM-Enterprise-Documentation/Get-started-with-Cortex-XSIAM", "update": false },
+          { "name": "XSIAM NG SIEM", "link": "Cortex-XSIAM/Cortex-XSIAM-NG-SIEM-Documentation/Get-started-with-Cortex-XSIAM", "update": false },
+          { "name": "API Reference", "link": "Cortex-XSIAM-REST-API/Cortex-XSIAM-Overview", "update": false },
+          { "name": "Analytics Alert Reference", "link": "Cortex-XSIAM/Cortex-XSIAM-Analytics-Alert-Reference-by-Alert-name/Cortex-XSIAM-Analytics-Alert-Reference", "update": false },
+          { "name": "XQL Language Reference", "link": "Cortex-XSIAM/Cortex-XSIAM-Documentation/Cortex-XSIAM-XQL", "update": false },
+          { "name": "Playbooks Reference", "link": "Cortex-XSIAM/Cortex-XSIAM-Documentation/Playbooks", "update": false },
+          { "name": "Data Model Schema", "link": "Cortex-XSIAM/Cortex-Data-Model-Schema-Guide/Introduction", "update": false },
+          { "name": "XQL Schema Reference", "link": "Cortex-XQL-Schema-Reference-Guide/Introduction", "update": false },
+          { "name": "Cortex Gateway", "link": "Cortex/Cortex-Gateway-Administrator-Guide/Cortex-Gateway", "update": false },
+          { "name": "SDK Reference", "link": "1/Demisto-SDK-Guide/Introduction-to-Demisto-SDK", "update": false }
+        ],
+        "link": "https://docs-cortex.paloaltonetworks.com/p/XSIAM"
+      },
+      {
+        "name": "Cortex XDR",
+        "children": [
+          {"name": "XDR Enterprise Getting Started", "link": "Cortex-XDR/Cortex-XDR-Documentation/Get-started-with-Cortex-XDR", "update": false},
+          { "name": "XDR Cloud Getting Started", "link": "Cortex-XDR/Cortex-XDR-Cloud-Documentation/Get-started-with-Cortex-XDR", "update": false},
+          {"name": "XQL Language Reference","link": "Cortex-XDR/Cortex-XDR-Documentation/Cortex-XDR-XQL", "update": false},
+          {"name": "Analytics Alert Reference","link": "Cortex-XDR/Cortex-XDR-Analytics-Alert-Reference-by-Alert-name/Cortex-XDR-Analytics-Alert-Reference", "update": false},
+          {"name": "API Reference","link": "Cortex-XDR-REST-API/Cortex-XDR-API-Overview", "update": false}
+        ],
+        "link": "https://docs-cortex.paloaltonetworks.com/p/XDR"
+      },
+      {
+        "name": "Cortex XSOAR",
+        "children": [
+          { "name": "Release Notes", "link": "Cortex-XSOAR/Cortex-XSOAR-Releases/Cortex-XSOAR-Releases", "update": false },
+          { "name": "XSOAR SaaS", "link": "Cortex-XSOAR/8/Cortex-XSOAR-Cloud-Documentation/Get-Started-with-Cortex-XSOAR", "update": false },
+          { "name": "XSOAR 8", "link": "Cortex-XSOAR/8.8/Cortex-XSOAR-On-prem-Documentation/Get-Started-with-Cortex-XSOAR", "update": false }
+        ],
+        "link": "https://docs-cortex.paloaltonetworks.com/p/XSOAR"
+      },
+      {
+        "name": "Cortex XPANSE",
+        "children": [
+          { "name": "Release Notes", "link": "Cortex-XPANSE/2/Cortex-Xpanse-Expander-Release-Notes/Cortex-Xpanse-Expander-Release-Information", "update": false  }
+        ],
+        "link": "https://docs-cortex.paloaltonetworks.com/p/XPANSE"
+      }
+    ],
+    "link": "https://docs-cortex.paloaltonetworks.com"
+}
+  

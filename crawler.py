@@ -2,6 +2,7 @@ import requests
 import json
 import os
 import re
+import shutil
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 import logging
@@ -19,7 +20,6 @@ CONTENT_ENDPOINT = f"{BASE_URL}/api/khub/maps/{{document_id}}/topics/{{topic_id}
 
 # Output directory
 OUTPUT_DIR = "cortex_docs"
-PAGES_DIR = os.path.join(OUTPUT_DIR, "pages")
 
 # Basic HTML template for individual files
 HTML_TEMPLATE = """<!DOCTYPE html>
@@ -109,14 +109,14 @@ def build_html_structure(toc, document_id, fingerprint, full_html, prefix="", pa
 
         # 2 & 3. Handle pages and sections with numbered folders/files
         if not parent_path:  # Top-level page
-            page_dir = os.path.join(PAGES_DIR, numbered_title)
+            page_dir = os.path.join(parent_path, numbered_title) if parent_path else numbered_title
             os.makedirs(page_dir, exist_ok=True)
             page_file = os.path.join(page_dir, f"{numbered_title}.html")
             logger.info(f"Writing page file: {page_file}")
             with open(page_file, "w", encoding="utf-8") as f:
                 f.write(HTML_TEMPLATE.format(title=f"{number_prefix} {title}", content=section_html))
         else:  # Section within a page
-            section_dir = os.path.join(PAGES_DIR, parent_path)
+            section_dir = parent_path
             os.makedirs(section_dir, exist_ok=True)
             section_file = os.path.join(section_dir, f"{numbered_title}.html")
             logger.info(f"Writing section file: {section_file}")
@@ -131,11 +131,37 @@ def build_html_structure(toc, document_id, fingerprint, full_html, prefix="", pa
         if progress_bar:
             progress_bar.update(1)
 
-def main():
-    # Initial setup
-    pretty_url = "Cortex-CLOUD/Cortex-Cloud-Runtime-Security-Documentation/Get-started-with-Cortex-Cloud"
-    os.makedirs(PAGES_DIR, exist_ok=True)
-    logger.info(f"Output directory setup: {OUTPUT_DIR}")
+def check_existing_files(doc_dir):
+    """Check if HTML files exist in the document directory."""
+    full_html_file = os.path.join(doc_dir, "full_documentation.html")
+    pages_dir = os.path.join(doc_dir, "pages")
+    return os.path.exists(full_html_file) or os.path.exists(pages_dir)
+
+def delete_existing_files(doc_dir):
+    """Delete existing HTML files and pages directory if they exist."""
+    full_html_file = os.path.join(doc_dir, "full_documentation.html")
+    pages_dir = os.path.join(doc_dir, "pages")
+    if os.path.exists(full_html_file):
+        os.remove(full_html_file)
+        logger.info(f"Deleted existing file: {full_html_file}")
+    if os.path.exists(pages_dir):
+        shutil.rmtree(pages_dir)
+        logger.info(f"Deleted existing directory: {pages_dir}")
+
+def process_document(pretty_url, product_folder, doc_name, update=False):
+    """Process a single document and save it under the product folder."""
+    doc_output_dir = os.path.join(OUTPUT_DIR, product_folder, sanitize_filename(doc_name))
+    pages_dir = os.path.join(doc_output_dir, "pages")
+
+    # Check update flag and existing files
+    if not update and check_existing_files(doc_output_dir):
+        logger.info(f"Skipping {doc_name} in {product_folder} as files exist and update is False")
+        return
+    elif update:
+        delete_existing_files(doc_output_dir)
+
+    os.makedirs(pages_dir, exist_ok=True)
+    logger.info(f"Processing document: {doc_name} in {doc_output_dir}")
 
     # Step 1: Get documentId
     document_id, _ = fetch_pretty_url(pretty_url)
@@ -146,20 +172,43 @@ def main():
     # Step 3: Get TOC and count items
     toc = fetch_pages(document_id, fingerprint)
     total_items = count_toc_items(toc)
-    logger.info(f"Total TOC items to process: {total_items}")
+    logger.info(f"Total TOC items to process for {doc_name}: {total_items}")
 
     # Step 4: Build HTML and file structure with progress bar
-    full_html = ["<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Cortex Cloud Runtime Security Documentation</title></head><body>"]
-    with tqdm(total=total_items, desc="Processing TOC items") as pbar:
-        build_html_structure(toc, document_id, fingerprint, full_html, progress_bar=pbar)
+    full_html = [f"<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>{doc_name}</title></head><body>"]
+    with tqdm(total=total_items, desc=f"Processing {doc_name}") as pbar:
+        build_html_structure(toc, document_id, fingerprint, full_html, progress_bar=pbar, parent_path=pages_dir)
     full_html.append("</body></html>")
 
     # Write full HTML file
-    full_html_file = os.path.join(OUTPUT_DIR, "full_documentation.html")
+    full_html_file = os.path.join(doc_output_dir, "full_documentation.html")
     logger.info(f"Writing full documentation: {full_html_file}")
     with open(full_html_file, "w", encoding="utf-8") as f:
         f.write("\n".join(full_html))
-    logger.info("Documentation generation complete")
+    logger.info(f"Completed processing {doc_name}")
+
+def main():
+    # Load the doctree.json file
+    with open("doctree.json", "r", encoding="utf-8") as f:
+        doctree = json.load(f)
+
+    # Ensure base output directory exists
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    logger.info(f"Base output directory setup: {OUTPUT_DIR}")
+
+    # Process each product and its children
+    for product in doctree["children"]:
+        product_name = sanitize_filename(product["name"])
+        logger.info(f"Processing product: {product_name}")
+        
+        for doc in product["children"]:
+            doc_name = doc["name"]
+            pretty_url = doc.get("link")
+            update = doc.get("update", False)
+            if pretty_url:  # Only process if link exists
+                process_document(pretty_url, product_name, doc_name, update)
+
+    logger.info("All documentation generation complete")
 
 if __name__ == "__main__":
     main()
