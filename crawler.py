@@ -33,6 +33,27 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 </body>
 </html>"""
 
+def make_request(method, url, **kwargs):
+    """
+    Helper function to make HTTP requests with retry logic.
+    Retries up to 5 times on timeout errors.
+    """
+    attempts = 5
+    for attempt in range(attempts):
+        try:
+            if method.lower() == "get":
+                response = requests.get(url, timeout=10, **kwargs)
+            elif method.lower() == "post":
+                response = requests.post(url, timeout=10, **kwargs)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+            response.raise_for_status()
+            return response
+        except requests.Timeout as e:
+            logger.warning(f"Timeout error on {url} attempt {attempt+1} of {attempts}. Retrying...")
+            if attempt == attempts - 1:
+                raise
+
 def sanitize_filename(title):
     """Sanitize a title to create a valid filename, preserving spaces and special characters minimally."""
     return re.sub(r'[<>:"/\\|?*]', '_', title).strip()
@@ -50,8 +71,7 @@ def fetch_pretty_url(pretty_url):
     """Step 1: Resolve Pretty URL to get documentId and tocId."""
     logger.info(f"Fetching Pretty URL: {pretty_url}")
     payload = {"prettyUrl": pretty_url, "forcedTocId": None}
-    response = requests.post(PRETTY_URL_ENDPOINT, json=payload)
-    response.raise_for_status()
+    response = make_request("post", PRETTY_URL_ENDPOINT, json=payload)
     data = response.json()
     logger.info(f"Received documentId: {data['documentId']}, tocId: {data['tocId']}")
     return data["documentId"], data["tocId"]
@@ -60,8 +80,7 @@ def fetch_document_map(document_id):
     """Step 2: Fetch Document Map to get fingerprint."""
     url = DOCUMENT_MAP_ENDPOINT.format(document_id=document_id)
     logger.info(f"Fetching Document Map for documentId: {document_id}")
-    response = requests.get(url)
-    response.raise_for_status()
+    response = make_request("get", url)
     data = response.json()
     logger.info(f"Received fingerprint: {data['fingerprint']}")
     return data["fingerprint"]
@@ -71,8 +90,7 @@ def fetch_pages(document_id, fingerprint):
     url = PAGES_ENDPOINT.format(document_id=document_id)
     params = {"v": fingerprint}
     logger.info(f"Fetching TOC for documentId: {document_id} with fingerprint: {fingerprint}")
-    response = requests.get(url, params=params)
-    response.raise_for_status()
+    response = make_request("get", url, params=params)
     toc = response.json()["paginatedToc"][0]["pageToc"]
     logger.info(f"TOC fetched with {len(toc)} top-level items")
     return toc
@@ -82,8 +100,7 @@ def fetch_content(document_id, topic_id, fingerprint):
     url = CONTENT_ENDPOINT.format(document_id=document_id, topic_id=topic_id)
     params = {"target": "DESIGNED_READER", "v": fingerprint}
     logger.info(f"Fetching content for topicId: {topic_id}")
-    response = requests.get(url, params=params)
-    response.raise_for_status()
+    response = make_request("get", url, params=params)
     logger.debug(f"Content fetched for topicId: {topic_id}")
     return response.text
 
@@ -145,7 +162,6 @@ def build_html_structure(toc, document_id, fingerprint, full_html, prefix="", pa
             logger.info(f"Writing subsection file (with aggregated sub-sections): {section_file}")
             with open(section_file, "w", encoding="utf-8") as f:
                 f.write(HTML_TEMPLATE.format(title=f"{number_prefix} {title}", content=section_content))
-
 
         # Recurse into children
         if item["children"]:
