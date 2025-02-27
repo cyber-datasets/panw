@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shutil
+import time
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 import logging
@@ -36,7 +37,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 def make_request(method, url, **kwargs):
     """
     Helper function to make HTTP requests with retry logic.
-    Retries up to 5 times on timeout errors.
+    Retries up to 5 times on timeout and connection errors,
+    sleeping 10 seconds before each retry.
     """
     attempts = 5
     for attempt in range(attempts):
@@ -49,9 +51,11 @@ def make_request(method, url, **kwargs):
                 raise ValueError(f"Unsupported HTTP method: {method}")
             response.raise_for_status()
             return response
-        except requests.Timeout as e:
-            logger.warning(f"Timeout error on {url} attempt {attempt+1} of {attempts}. Retrying...")
+        except (requests.Timeout, requests.ConnectionError) as e:
+            logger.warning(f"Error on {url} attempt {attempt+1} of {attempts}: {e}. Retrying in 10 seconds...")
+            time.sleep(10)
             if attempt == attempts - 1:
+                logger.error(f"Failed to fetch {url} after {attempts} attempts.")
                 raise
 
 def sanitize_filename(title):
@@ -96,13 +100,17 @@ def fetch_pages(document_id, fingerprint):
     return toc
 
 def fetch_content(document_id, topic_id, fingerprint):
-    """Step 4: Fetch HTML content for a specific topic."""
+    """Step 4: Fetch HTML content for a specific topic with error handling."""
     url = CONTENT_ENDPOINT.format(document_id=document_id, topic_id=topic_id)
     params = {"target": "DESIGNED_READER", "v": fingerprint}
     logger.info(f"Fetching content for topicId: {topic_id}")
-    response = make_request("get", url, params=params)
-    logger.debug(f"Content fetched for topicId: {topic_id}")
-    return response.text
+    try:
+        response = make_request("get", url, params=params)
+        logger.debug(f"Content fetched for topicId: {topic_id}")
+        return response.text
+    except Exception as e:
+        logger.error(f"Failed to fetch content for topicId {topic_id}: {e}")
+        return f"<!-- Error fetching content for topicId {topic_id}: {e} -->"
 
 def build_section_content(toc, document_id, fingerprint, prefix=""):
     """Build HTML content for a section including all subsections recursively."""
@@ -172,10 +180,12 @@ def build_html_structure(toc, document_id, fingerprint, full_html, prefix="", pa
             progress_bar.update(1)
 
 def check_existing_files(doc_dir):
-    """Check if HTML files exist in the document directory."""
+    """
+    Check if the document is fully pulled.
+    For this implementation, fully pulled means the full_documentation.html exists in the doc root.
+    """
     full_html_file = os.path.join(doc_dir, "full_documentation.html")
-    pages_dir = os.path.join(doc_dir, "pages")
-    return os.path.exists(full_html_file) or os.path.exists(pages_dir)
+    return os.path.exists(full_html_file)
 
 def delete_existing_files(doc_dir):
     """Delete existing HTML files and pages directory if they exist."""
@@ -193,9 +203,9 @@ def process_document(pretty_url, product_folder, doc_name, update=False):
     doc_output_dir = os.path.join(OUTPUT_DIR, product_folder, sanitize_filename(doc_name))
     pages_dir = os.path.join(doc_output_dir, "pages")
 
-    # Check update flag and existing files
+    # Check update flag and existing files (fully pulled means full_documentation.html exists)
     if not update and check_existing_files(doc_output_dir):
-        logger.info(f"Skipping {doc_name} in {product_folder} as files exist and update is False")
+        logger.info(f"Skipping {doc_name} in {product_folder} as full_documentation.html already exists.")
         return
     elif update:
         delete_existing_files(doc_output_dir)
