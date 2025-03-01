@@ -14,7 +14,7 @@ load_dotenv()
 OLLAMA_HOST = os.getenv('OLLAMA_HOST', 'http://localhost:11434')
 OLLAMA_MODEL = os.getenv('OLLAMA_MODEL', 'llama3')
 YAML_DIR = os.getenv('YAML_DIR', './xql_queries')
-OUTPUT_FILE = os.getenv('OUTPUT_FILE', 'dataset.jsonl')
+OUTPUT_FILE = os.getenv('OUTPUT_FILE', 'dataset.json')
 PROCESSED_DIR = os.getenv('PROCESSED_DIR', './processed_xql_queries')
 
 # Print key info for verification
@@ -37,7 +37,7 @@ class QueryDetails(BaseModel):
     xql: str = ''
 
 class DatasetGenerator:
-    """Agent to process YAML files, generate prompts, and create a dataset incrementally."""
+    """Agent to process YAML files, generate prompts, and create a dataset in ShareGPT format incrementally."""
     
     def __init__(self, yaml_dir: str, output_file: str, processed_dir: str, ollama_host: str, ollama_model: str):
         """Initialize with directories, output file, and Ollama config."""
@@ -46,7 +46,7 @@ class DatasetGenerator:
         self.processed_dir = processed_dir
         self.ollama_client = Client(host=ollama_host)
         self.ollama_model = ollama_model
-        self.total_pairs_written = 0  # Track total pairs written
+        self.dataset_entries = []  # List to hold dataset entries incrementally
 
     def read_yaml(self, file_path: str) -> QueryDetails:
         """Read and parse a YAML file into a QueryDetails object."""
@@ -104,20 +104,21 @@ class DatasetGenerator:
         except Exception as e:
             print(f"Failed to move {filename}: {e}")
 
-    def append_to_dataset(self, pair: dict):
-        """Append a single prompt-XQL pair to the JSONL file."""
+    def save_dataset(self):
+        """Save the current dataset entries to the JSON file."""
+        if not self.dataset_entries:
+            print("No entries to save.")
+            return
         try:
-            mode = 'a' if os.path.exists(self.output_file) else 'w'
-            with open(self.output_file, mode) as f:
-                json.dump(pair, f)
-                f.write('\n')
-            self.total_pairs_written += 1
-            print(f"Appended to {self.output_file}: Prompt length: {len(pair['prompt'])}, Response length: {len(pair['response'])}")
+            print(f"Updating dataset file: {self.output_file} with {len(self.dataset_entries)} entries")
+            with open(self.output_file, 'w') as f:
+                json.dump(self.dataset_entries, f, indent=2)
+            print(f"Dataset updated successfully with {len(self.dataset_entries)} entries")
         except Exception as e:
-            print(f"Failed to append to dataset: {e}")
+            print(f"Failed to update dataset: {e}")
 
     def process_files(self):
-        """Process YAML files, generate pairs, append to dataset, and move files."""
+        """Process YAML files, generate entries, save incrementally, and move files."""
         yaml_files = [f for f in os.listdir(self.yaml_dir) if f.endswith(('.yaml', '.yml'))]
         total_files = len(yaml_files)
         print(f"Found {total_files} YAML files to process in {self.yaml_dir}")
@@ -137,15 +138,19 @@ class DatasetGenerator:
                     print(f"Skipping {filename}: Empty XQL query.")
                     self.move_processed_file(file_path)
                     continue
-                pair = {'prompt': generated_prompt, 'response': cleaned_xql}
-                self.append_to_dataset(pair)  # Write to file immediately
+                # Create ShareGPT-structured entry
+                conversation = [
+                    {"from": "human", "value": generated_prompt},
+                    {"from": "gpt", "value": cleaned_xql}
+                ]
+                entry = {"conversations": conversation}
+                self.dataset_entries.append(entry)
+                self.save_dataset()  # Save after each entry
                 self.move_processed_file(file_path)
-                print(f"Processed and appended {filename} to dataset")
+                print(f"Processed {filename} and updated dataset with entry {len(self.dataset_entries)}")
             except Exception as e:
                 print(f"Error processing {filename}: {e}")
                 continue
-        
-        print(f"\nTotal pairs written to dataset: {self.total_pairs_written}")
 
     def run(self):
         """Execute the dataset creation process."""
